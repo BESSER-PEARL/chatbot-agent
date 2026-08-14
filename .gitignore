@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+vector_store/
+application.log
+config.yaml
+*.env

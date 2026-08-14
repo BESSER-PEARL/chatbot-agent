@@ -1,0 +1,35 @@
+# Production run-only stack for the BESSER website chat-agent, on the WME host.
+# This mirrors what actually runs at /home/ec2-user/website-chat-agent on the EC2
+# box — a SEPARATE compose project from the WME, sharing only the host and the
+# nginx reverse proxy.
+#
+# HOW IT UPDATES (no manual build on the host — it only has ~0.5 GB free RAM):
+#   1. CI (.github/workflows/chat-agent.yml) builds the image on a merge to main
+#      and pushes it to artefacts.list.lu.
+#   2. A host-wide `watchtower` container (already running, polls ~30 min) pulls
+#      the new :latest and recreates this container.
+#   3. The vector store is ephemeral (no volume), so the fresh container
+#      re-indexes readthedocs.io + BAF docs + the site on boot — no `down -v`.
+#
+# Manual roll (force it now instead of waiting for watchtower):
+#   cd /home/ec2-user/website-chat-agent
+#   docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d
+#
+# DB-less: no conversation monitoring. To enable it, add a `db` service (see the
+# dev docker-compose.yml) and the POSTGRES_* env below.
+#
+# Port 8766 is chosen to coexist with the WME modeling agent on 8765.
+
+services:
+  chat-agent:
+    image: artefacts.list.lu/besser/web_modeling_editor/website_chat_agent:latest
+    container_name: besser-website-chat-agent
+    env_file:
+      - ./chat-agent.env          # OPENAI_API_KEY (+ POSTGRES_* if you enable monitoring)
+    environment:
+      PYTHONUNBUFFERED: "1"
+    # Loopback only. Public access is via the reverse proxy → wss://…/chat.
+    ports:
+      - "127.0.0.1:8766:8766"
+    mem_limit: 1g                 # never let the agent starve the editor on the shared host
+    restart: unless-stopped

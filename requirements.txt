@@ -1,0 +1,10 @@
+besser-agentic-framework[extras,llms]==4.5.1
+python-dotenv
+langchain-community
+langchain-text-splitters
+langchain-openai
+langchain-chroma
+chromadb
+psycopg2-binary
+beautifulsoup4
+rank_bm25

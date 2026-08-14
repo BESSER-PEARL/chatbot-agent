@@ -1,0 +1,48 @@
+# LOCAL DEV ONLY. Builds the agent from local source and keeps a *persistent*
+# `vector_store` volume so restarts don't re-crawl — run `docker compose down -v`
+# to force a re-index. Production is docker-compose.prod.yml (run-only image from
+# artefacts.list.lu, watchtower-updated, ephemeral store that re-indexes on every
+# deploy). See DEPLOY.md.
+services:
+  db:
+    build:
+      context: .
+      dockerfile: DBDockerFile
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mypassword}
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_DB: ${POSTGRES_DB:-mydatabase}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-myuser} -d ${POSTGRES_DB:-mydatabase}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8766:8766"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-mydatabase}
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mypassword}
+    volumes:
+      - vector_store:/app/vector_store
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  postgres_data:
+  vector_store:
